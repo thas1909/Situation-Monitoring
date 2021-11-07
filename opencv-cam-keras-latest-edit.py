@@ -1,4 +1,5 @@
   # -*- coding: utf-8 -*-
+# --- Kivy Imports ---
 #:include cvcamera.kv
 from kivy.config import Config
 # Setting the initial window size of kivy. It can be resized during the process too. 
@@ -19,15 +20,38 @@ from kivy.core.window import Window
 from kivy.uix.actionbar import ActionBar,ActionButton,ActionView,ActionPrevious
 from kivy.uix.dropdown import DropDown
 
-
+# --- Neo4j Setup ---
 from py2neo import Graph,Node,Relationship
+# Access Graph
+g = Graph("bolt://neo4j:password@localhost:7687")
 
-import os,sys
-import numpy as np
-from tabs.risk_data import risk_data
-import pyautogui
+# --- pyKinectAzure Imports ---
+import sys
+sys.path.insert(1, 'pykinect/pyKinectAzure/')
+from pykinect.pyKinectAzure import pyKinectAzure, _k4a # to handle depth & color images from this library
+# Path to the module
+# TODO: Modify with the path containing the k4a.dll from the Azure Kinect SDK
+modulePath = 'C:\\Program Files\\Azure Kinect SDK v1.4.1\\sdk\\windows-desktop\\amd64\\release\\bin\\k4a.dll' 
+# Initialize the library with the path containing the module
+# pyK4A = pyKinectAzure(modulePath)
 
-import colorsys
+# # Open device
+# pyK4A.device_open()
+
+# # Modify camera configuration
+# device_config = pyK4A.config
+# device_config.color_format = _k4a.K4A_IMAGE_FORMAT_COLOR_BGRA32
+# device_config.color_resolution = _k4a.K4A_COLOR_RESOLUTION_720P
+# device_config.depth_mode = _k4a.K4A_DEPTH_MODE_WFOV_2X2BINNED
+# print(device_config)
+
+# # Start cameras using modified configuration
+# pyK4A.device_start_cameras(device_config)
+# k = 0
+
+# --- Tensorflow/Keras Imports ---
+import os
+os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 from timeit import default_timer as timer
 
@@ -41,38 +65,28 @@ session = InteractiveSession(config=config)
 from keras import backend as K
 from keras.models import load_model
 from keras.layers import Input
-from PIL import Image, ImageFont, ImageDraw
-
+from keras.utils import multi_gpu_model
 
 from yolo3.model import yolo_eval, yolo_body, tiny_yolo_body
 from yolo3.utils import letterbox_image
-import os
-os.environ['CUDA_VISIBLE_DEVICES'] = '0'
-from keras.utils import multi_gpu_model
 gpu_num=1
 
+# --- Image Preocessing Library Imports ---
 import cv2
-cap = cv2.VideoCapture(1)
+cap = cv2.VideoCapture(0)
+from PIL import Image, ImageFont, ImageDraw
 #camera_scale = 1.
 
-""" from py2neo import Graph,Node,Relationship
-g = Graph("bolt://neo4j:password@localhost:7687")
+# --- Other Imports ---
+import numpy as np
+import pyautogui # For screeen capture
+import colorsys # For box coloring
+from tabs.risk_data import risk_data 
 
-a = Node("Person", name="Alice", age=33)
-b = Node("Person", name="Bob", age=44)
-KNOWS = Relationship.type("KNOWS")
-#g.merge(KNOWS(a, b), "Person", "name")# Primary label, Primary Key
-
-# Pre-defined relations
-relations = ["is-near","is-over","Has-a","Leads-to"] """
-
-Builder.load_string("""
-<CvCamera>
-    Image:
-        id: img 
-    Button:
-        id: btn_main
-""")        
+# --- Initializing the variables ---
+scale = 1 #To avoid out of frame issues etc. scale goes from 1 to 0.01 (100% to 1%)
+risk_objects = [] # List to store the predicted objects that can pose risks
+popup_status = 0 # To show alert when child approaches closer to dangerous objects
 
 model_path = 'model_data/yolov3.h5'#trained_weights_final_blind.h5' # model path or trained weights path
 anchors_path = 'model_data/yolo_anchors.txt'
@@ -86,7 +100,6 @@ classes_path = os.path.expanduser(classes_path)
 with open(classes_path) as f:
     class_names = f.readlines()
 class_names = [c.strip() for c in class_names]
-
 
 # Get Anchors
 anchors_path = os.path.expanduser(anchors_path)
@@ -113,7 +126,6 @@ else:
     assert yolo_model.layers[-1].output_shape[-1] == \
         num_anchors/len(yolo_model.output) * (num_classes + 5), \
         'Mismatch between model and given anchor and class sizes'
-
 #print('{} model, anchors, and classes loaded.'.format(model_path))
 
 # Generate colors for drawing bounding boxes.
@@ -129,127 +141,26 @@ np.random.seed(None)  # Reset seed to default.
 # Generate output tensor targets for filtered bounding boxes.
 input_image_shape = K.placeholder(shape=(2, ))
 
-if gpu_num>=2:
-    yolo_model = multi_gpu_model(yolo_model, gpus=gpu_num)
+# if gpu_num>=2:
+#     yolo_model = multi_gpu_model(yolo_model, gpus=gpu_num)
 
 boxes, scores, classes = yolo_eval( yolo_model.output, anchors,
                                     len(class_names), input_image_shape,
                                     score_threshold = score, iou_threshold = iou )
 
+sess = K.get_session() # Starting a new keras session...
 
+# .... To be Developed ....
+def get_data_from_neo4j():
+    print("Objects:")
+    dangerousObjects = g.run("""MATCH (n) WHERE EXISTS(n.name) RETURN DISTINCT "node" as entity, n.name AS name LIMIT 25 UNION ALL MATCH ()-[r]-() WHERE EXISTS(r.name) RETURN DISTINCT "relationship" AS entity, r.name AS name""")
+    for record in dangerousObjects:
+        print(record["name"])
 
-sess = K.get_session()
-
-# def close_session(self):
-#     self.sess.close()
-
-
-""" def detect_video(yolo, video_path, output_path=""):
-    import cv2
-    vid = cv2.VideoCapture(video_path)
-    if not vid.isOpened():
-        raise IOError("Couldn't open webcam or video")
-    video_FourCC    = int(vid.get(cv2.CAP_PROP_FOURCC))
-    video_fps       = vid.get(cv2.CAP_PROP_FPS)
-    video_size      = (int(vid.get(cv2.CAP_PROP_FRAME_WIDTH)),
-                        int(vid.get(cv2.CAP_PROP_FRAME_HEIGHT)))
-    isOutput = True if output_path != "" else False
-    if isOutput:
-        print("!!! TYPE:", type(output_path), type(video_FourCC), type(video_fps), type(video_size))
-        out = cv2.VideoWriter(output_path, video_FourCC, video_fps, video_size)
-    accum_time = 0
-    curr_fps = 0
-    fps = "FPS: ??"
-    prev_time = timer()
-    while True:
-        return_value, frame = vid.read()
-        image = Image.fromarray(frame)
-        image = yolo.detect_image(image)
-        result = np.asarray(image)
-        curr_time = timer()
-        exec_time = curr_time - prev_time
-        prev_time = curr_time
-        accum_time = accum_time + exec_time
-        curr_fps = curr_fps + 1
-        if accum_time > 1:
-            accum_time = accum_time - 1
-            fps = "FPS: " + str(curr_fps)
-            curr_fps = 0
-        cv2.putText(result, text=fps, org=(3, 15), fontFace=cv2.FONT_HERSHEY_SIMPLEX,
-                    fontScale=0.50, color=(255, 0, 0), thickness=2)
-        cv2.namedWindow("result", cv2.WINDOW_NORMAL)
-        cv2.imshow("result", result)
-        if isOutput:
-            out.write(result)
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            break
-    yolo.close_session()
-    
- """
-
-""" def detect_img(yolo):
-    while True:
-        ret, image = cap.read()
-        if cv2.waitKey(10) == 27:
-            break
-        h, w = image.shape[:2]
-        rh = int(h * camera_scale)
-        rw = int(w * camera_scale)
-        image = cv2.resize(image, (rw, rh))
-        image = image[:,:,(2,1,0)]
-        image = Image.fromarray(image)
-        r_image = yolo.detect_image(image)
-        out_img = np.array(r_image)[:,:,(2,1,0)]
-        cv2.imshow("YOLOv2", np.array(out_img))
-    yolo.close_session()
- """
-
-"""
-configPath="yolo-coco/yolov3.cfg"
-weightsPath="yolo-coco/yolov3.weights"
-conf=0.1
-thresh=0.1
-# load the COCO class labels our YOLO model was trained on
-labelsPath = "yolo-coco/coco.names"
-LABELS = open(labelsPath).read().strip().split("\n")
-
-# initialize a list of colors to represent each possible class label
-np.random.seed(42)
-COLORS = np.random.randint(0, 255, size=(len(LABELS), 3),
-	     dtype="uint8")
-
-
-# load our YOLO object detector trained on COCO dataset (80 classes)
-# and determine only the *output* layer names that we need from YOLO
-print("[INFO] loading YOLO from disk...")
-net = cv2.dnn.readNetFromDarknet(configPath, weightsPath)
-
-# Using GPU
-net.setPreferableBackend(cv2.dnn.DNN_BACKEND_CUDA)
-net.setPreferableTarget(cv2.dnn.DNN_TARGET_CUDA)
-print(cv2.cuda.getCudaEnabledDeviceCount())
-
-ln = net.getLayerNames()
-ln = [ln[i[0] - 1] for i in net.getUnconnectedOutLayers()]
-"""
-
-scale = 1 #To avoid out of frame issues etc. scale goes from 1 to 0.01 (100% to 1%)
-risk_objects = [] # List to store the predicted objects that can pose risks
-popup_status = 0
-
-# Access Graph
-g = Graph("bolt://neo4j:password@localhost:7687")
-
-
-print("Objects:")
-dangerousObjects = g.run("""MATCH (n) WHERE EXISTS(n.name) RETURN DISTINCT "node" as entity, n.name AS name LIMIT 25 UNION ALL MATCH ()-[r]-() WHERE EXISTS(r.name) RETURN DISTINCT "relationship" AS entity, r.name AS name""")
-for record in dangerousObjects:
-    print(record["name"])
-
-print("\nRisks:")
-risks = g.run("""MATCH (n) WHERE EXISTS(n.type) RETURN DISTINCT "node" as entity, n.type AS type LIMIT 25 UNION ALL MATCH ()-[r]-() WHERE EXISTS(r.type) RETURN DISTINCT "relationship" AS entity, r.type AS type""")
-for record in risks:
-    print(record["type"])
+    print("\nRisks:")
+    risks = g.run("""MATCH (n) WHERE EXISTS(n.type) RETURN DISTINCT "node" as entity, n.type AS type LIMIT 25 UNION ALL MATCH ()-[r]-() WHERE EXISTS(r.type) RETURN DISTINCT "relationship" AS entity, r.type AS type""")
+    for record in risks:
+        print(record["type"])
 
 main_widget_count = 0
 
@@ -323,9 +234,6 @@ class CvCamera(App):
         main_widget_count = len(self.layout.children)
         print("////////////////// Len of widget:",main_widget_count)
 
-        #カメラ待ち
-        #while not self._cap.isOpened(): 
-        #    pass 
         # 更新スケジュールとコールバックの指定
         Clock.schedule_interval(self.update, 1.0/30.0)
         return self.layout
@@ -442,7 +350,6 @@ class CvCamera(App):
         act_view.add_widget(act_btn)
         act_bar.add_widget(act_view)
 
-
     def update(self,dt):
         # 基本的にここでOpenCV周りの処理を行なってtextureを更新する
         global scale
@@ -530,11 +437,13 @@ class CvCamera(App):
         #print("Thickness = ",thickness)
 
         for i, c in reversed(list(enumerate(out_classes))):
+            # Check for the person outclass=0 points to "Person" in coco-classes.txt
+            child_found = True if "0" in out_classes else False 
+
             predicted_class = class_names[c]
             box = out_boxes[i]
-            score = out_scores[i]
+            #score = out_scores[i]
 
-             # x=left, y=yop
            
             for k,v in risk_data.items():
                 
@@ -548,9 +457,7 @@ class CvCamera(App):
                     bottom = min(image.size[1], np.floor(bottom + 0.5).astype('int32'))
                     right = min(image.size[0], np.floor(right + 0.5).astype('int32'))
                     
-                    l = 10 # Window size where depth values will be considered
-                    mid_x = (int)((left+right)/2)
-                    mid_y = (int)((top+bottom)/2)
+
 
                     #label = "{}: {:.2f}  {}".format(predicted_class,score,risk)
                     #label = '{} {:.2f}'.format(predicted_class, score)
@@ -565,6 +472,10 @@ class CvCamera(App):
                     else:
                         text_origin = np.array([left, top - 1])
                     
+                    # l = 10 # Window size where depth values will be considered
+                    # mid_x = (int)((left+right)/2)
+                    # mid_y = (int)((top+bottom)/2)
+
                     for i in range(thickness):
                         draw.rectangle(
                             [left + i, top + i, right - i, bottom - i],
@@ -621,85 +532,185 @@ class CvCamera(App):
 
 if __name__ == '__main__':
     CvCamera().run()
-    
+
+
+""" 
+## Neo4j examples
+def Neo4j():
+    from py2neo import Graph,Node,Relationship
+    g = Graph("bolt://neo4j:password@localhost:7687")
+
+    a = Node("Person", name="Alice", age=33)
+    b = Node("Person", name="Bob", age=44)
+    KNOWS = Relationship.type("KNOWS")
+    #g.merge(KNOWS(a, b), "Person", "name")# Primary label, Primary Key
+
+    # Pre-defined relations
+    relations = ["is-near","is-over","Has-a","Leads-to"] 
+
 ## COMMENT A
-"""     
-        #print(H,W)
-        # construct a blob from the input frame and then perform a forward
-        # pass of the YOLO object detector, giving us our bounding boxes
-        # and associated probabilities
-        blob = cv2.dnn.blobFromImage(frame, 1 / 255.0, (416, 416),
-        swapRB=True, crop=False)
-        net.setInput(blob)
-        #start = time.time()
-        layerOutputs = net.forward(ln)
-        #end = time.time()
+def close_session(self):
+    self.sess.close()
 
-        # initialize our lists of detected bounding boxes, confidences,
-        # and class IDs, respectively
-        boxes = []
-        confidences = []
-        classIDs = []
+def detect_video(yolo, video_path, output_path=""):
+    import cv2
+    vid = cv2.VideoCapture(video_path)
+    if not vid.isOpened():
+        raise IOError("Couldn't open webcam or video")
+    video_FourCC    = int(vid.get(cv2.CAP_PROP_FOURCC))
+    video_fps       = vid.get(cv2.CAP_PROP_FPS)
+    video_size      = (int(vid.get(cv2.CAP_PROP_FRAME_WIDTH)),
+                        int(vid.get(cv2.CAP_PROP_FRAME_HEIGHT)))
+    isOutput = True if output_path != "" else False
+    if isOutput:
+        print("!!! TYPE:", type(output_path), type(video_FourCC), type(video_fps), type(video_size))
+        out = cv2.VideoWriter(output_path, video_FourCC, video_fps, video_size)
+    accum_time = 0
+    curr_fps = 0
+    fps = "FPS: ??"
+    prev_time = timer()
+    while True:
+        return_value, frame = vid.read()
+        image = Image.fromarray(frame)
+        image = yolo.detect_image(image)
+        result = np.asarray(image)
+        curr_time = timer()
+        exec_time = curr_time - prev_time
+        prev_time = curr_time
+        accum_time = accum_time + exec_time
+        curr_fps = curr_fps + 1
+        if accum_time > 1:
+            accum_time = accum_time - 1
+            fps = "FPS: " + str(curr_fps)
+            curr_fps = 0
+        cv2.putText(result, text=fps, org=(3, 15), fontFace=cv2.FONT_HERSHEY_SIMPLEX,
+                    fontScale=0.50, color=(255, 0, 0), thickness=2)
+        cv2.namedWindow("result", cv2.WINDOW_NORMAL)
+        cv2.imshow("result", result)
+        if isOutput:
+            out.write(result)
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
+    yolo.close_session()
+    
+def detect_img(yolo):
+    while True:
+        ret, image = cap.read()
+        if cv2.waitKey(10) == 27:
+            break
+        h, w = image.shape[:2]
+        rh = int(h * camera_scale)
+        rw = int(w * camera_scale)
+        image = cv2.resize(image, (rw, rh))
+        image = image[:,:,(2,1,0)]
+        image = Image.fromarray(image)
+        r_image = yolo.detect_image(image)
+        out_img = np.array(r_image)[:,:,(2,1,0)]
+        cv2.imshow("YOLOv2", np.array(out_img))
+    yolo.close_session()
 
-        # loop over each of the layer outputs
-        for output in layerOutputs:
-            # loop over each of the detections
-            for detection in output:
-                # extract the class ID and confidence (i.e., probability)
-                # of the current object detection
-                scores = detection[5:]
-                classID = np.argmax(scores)
-                confidence = scores[classID]
+def cv2_dnn_darknet():
+    configPath="yolo-coco/yolov3.cfg"
+    weightsPath="yolo-coco/yolov3.weights"
+    conf=0.1
+    thresh=0.1
+    # load the COCO class labels our YOLO model was trained on
+    labelsPath = "yolo-coco/coco.names"
+    LABELS = open(labelsPath).read().strip().split("\n")
 
-                # filter out weak predictions by ensuring the detected
-                # probability is greater than the minimum probability
-                if confidence > conf:
-                    # scale the bounding box coordinates back relative to
-                    # the size of the image, keeping in mind that YOLO
-                    # actually returns the center (x, y)-coordinates of
-                    # the bounding box followed by the boxes' width and
-                    # height
-                    box = detection[0:4] * np.array([W, H, W, H])
-                    (centerX, centerY, width, height) = box.astype("int")
+    # initialize a list of colors to represent each possible class label
+    np.random.seed(42)
+    COLORS = np.random.randint(0, 255, size=(len(LABELS), 3),
+            dtype="uint8")
 
-                    # use the center (x, y)-coordinates to derive the top
-                    # and and left corner of the bounding box
-                    x = int(centerX - (width / 2))
-                    y = int(centerY - (height / 2))
 
-                    # update our list of bounding box coordinates,
-                    # confidences, and class IDs
-                    boxes.append([x, y, int(width), int(height)])
-                    confidences.append(float(confidence))
-                    classIDs.append(classID)
+    # load our YOLO object detector trained on COCO dataset (80 classes)
+    # and determine only the *output* layer names that we need from YOLO
+    print("[INFO] loading YOLO from disk...")
+    net = cv2.dnn.readNetFromDarknet(configPath, weightsPath)
 
-        # apply non-maxima suppression to suppress weak, overlapping
-        # bounding boxes
-        idxs = cv2.dnn.NMSBoxes(boxes, confidences, conf,thresh)
+    # Using GPU
+    net.setPreferableBackend(cv2.dnn.DNN_BACKEND_CUDA)
+    net.setPreferableTarget(cv2.dnn.DNN_TARGET_CUDA)
+    print(cv2.cuda.getCudaEnabledDeviceCount())
 
-        
-        # ensure at least one detection exists
-        if len(idxs) > 0:
-            # loop over the indexes we are keeping
-            for i in idxs.flatten():
-                # extract the bounding box coordinates
-                (x, y) = (boxes[i][0], boxes[i][1])
-                (w, h) = (boxes[i][2], boxes[i][3])
+    ln = net.getLayerNames()
+    ln = [ln[i[0] - 1] for i in net.getUnconnectedOutLayers()]
 
-                # draw a bounding box rectangle and label on the frame
-                color = [int(c) for c in COLORS[classIDs[i]]]
-                cv2.rectangle(frame, (x, y), (x + w, y + h), color, 2)
-                for k,v in risk_data.items():
-                    if LABELS[classIDs[i]] in k:
-                        obj=LABELS[classIDs[i]]
-                        risk="Risk: {}".format(v)
-                        self.createButton(x,720-y,obj,v)                       
-                                
-                    else:
-                        risk=""
-                    
-                    text = "{}: {:.4f}  {}".format(LABELS[classIDs[i]],
-                        confidences[i],risk)
-                    cv2.putText(frame, text, (x, y - 5),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
-        """
+    # construct a blob from the input frame and then perform a forward
+    # pass of the YOLO object detector, giving us our bounding boxes
+    # and associated probabilities
+    blob = cv2.dnn.blobFromImage(frame, 1 / 255.0, (416, 416),
+    swapRB=True, crop=False)
+    net.setInput(blob)
+    #start = time.time()
+    layerOutputs = net.forward(ln)
+    #end = time.time()
+
+    # initialize our lists of detected bounding boxes, confidences,
+    # and class IDs, respectively
+    boxes = []
+    confidences = []
+    classIDs = []
+
+    # loop over each of the layer outputs
+    for output in layerOutputs:
+        # loop over each of the detections
+        for detection in output:
+            # extract the class ID and confidence (i.e., probability)
+            # of the current object detection
+            scores = detection[5:]
+            classID = np.argmax(scores)
+            confidence = scores[classID]
+
+            # filter out weak predictions by ensuring the detected
+            # probability is greater than the minimum probability
+            if confidence > conf:
+                # scale the bounding box coordinates back relative to
+                # the size of the image, keeping in mind that YOLO
+                # actually returns the center (x, y)-coordinates of
+                # the bounding box followed by the boxes' width and
+                # height
+                box = detection[0:4] * np.array([W, H, W, H])
+                (centerX, centerY, width, height) = box.astype("int")
+
+                # use the center (x, y)-coordinates to derive the top
+                # and and left corner of the bounding box
+                x = int(centerX - (width / 2))
+                y = int(centerY - (height / 2))
+
+                # update our list of bounding box coordinates,
+                # confidences, and class IDs
+                boxes.append([x, y, int(width), int(height)])
+                confidences.append(float(confidence))
+                classIDs.append(classID)
+
+    # apply non-maxima suppression to suppress weak, overlapping
+    # bounding boxes
+    idxs = cv2.dnn.NMSBoxes(boxes, confidences, conf,thresh)
+
+    # ensure at least one detection exists
+    if len(idxs) > 0:
+        # loop over the indexes we are keeping
+        for i in idxs.flatten():
+            # extract the bounding box coordinates
+            (x, y) = (boxes[i][0], boxes[i][1])
+            (w, h) = (boxes[i][2], boxes[i][3])
+
+            # draw a bounding box rectangle and label on the frame
+            color = [int(c) for c in COLORS[classIDs[i]]]
+            cv2.rectangle(frame, (x, y), (x + w, y + h), color, 2)
+            for k,v in risk_data.items():
+                if LABELS[classIDs[i]] in k:
+                    obj=LABELS[classIDs[i]]
+                    risk="Risk: {}".format(v)
+                    self.createButton(x,720-y,obj,v)                       
+                            
+                else:
+                    risk=""
+                
+                text = "{}: {:.4f}  {}".format(LABELS[classIDs[i]],
+                    confidences[i],risk)
+                cv2.putText(frame, text, (x, y - 5),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
+"""
