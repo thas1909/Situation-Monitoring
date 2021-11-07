@@ -47,7 +47,7 @@ class popup(App):
     def show_info(self,obj,risk):
         print("Parameter passd to show\/info function:",obj)
         from subprocess import Popen, PIPE
-        process = Popen(['python', 'show_info.py',obj,risk], stdout=PIPE, stderr=PIPE)
+        process = Popen(['python', 'tabs/show_info.py',obj,risk], stdout=PIPE, stderr=PIPE)
 
 if __name__ == "__main__":
     popup().run()   
