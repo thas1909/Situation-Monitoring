@@ -1,16 +1,16 @@
-import sys
-sys.path.insert(1, 'pyKinectAzure/')
-import numpy as np
-from pyKinectAzure import pyKinectAzure, _k4a
-import cv2
+# import sys
+# sys.path.insert(1, 'pyKinectAzure/')
+# import numpy as np
+# from pyKinectAzure import pyKinectAzure, _k4a
+# import cv2
 
-# Path to the module
-# TODO: Modify with the path containing the k4a.dll from the Azure Kinect SDK
-modulePath = 'C:\\Program Files\\Azure Kinect SDK v1.4.1\\sdk\\windows-desktop\\amd64\\release\\bin\\k4a.dll' 
-# under x86_64 linux please use r'/usr/lib/x86_64-linux-gnu/libk4a.so'
-# In Jetson please use r'/usr/lib/aarch64-linux-gnu/libk4a.so'
+# # Path to the module
+# # TODO: Modify with the path containing the k4a.dll from the Azure Kinect SDK
+# modulePath = 'C:\\Program Files\\Azure Kinect SDK v1.4.1\\sdk\\windows-desktop\\amd64\\release\\bin\\k4a.dll' 
+# # under x86_64 linux please use r'/usr/lib/x86_64-linux-gnu/libk4a.so'
+# # In Jetson please use r'/usr/lib/aarch64-linux-gnu/libk4a.so'
 
-def get_depth_info(obj_points):
+def get_depth_info(transformed_depth_image,obj_points):
 	left,top,right,bottom = [i for i in obj_points]
 	#print(left,top,right,bottom)
 	"""
@@ -32,14 +32,15 @@ def get_depth_info(obj_points):
 		for j in range(2*l):
 			tmp.append(transformed_depth_image[mid_y+i-l][mid_x+j-l])
 		#values.append(tmp)
-		print(tmp,"\n")
+		#print(tmp,"\n")
 
 	#print(values)	
 	mid = transformed_depth_image[mid_y][mid_x]
 	
 	print("Distance to obj_centre: ",mid,"mm\n")
+	return mid
 	
-
+"""
 if __name__ == "__main__":
 
 	# Initialize the library with the path containing the module
@@ -79,7 +80,6 @@ if __name__ == "__main__":
 			# Transform the depth image to the color format
 			transformed_depth_image = pyK4A.transform_depth_to_color(depth_image_handle,color_image_handle)
 			
-
 			# height: 720 elements : len(transformed_depth_image)
 			# width: 1280 elements : len(transformed_depth_image[0]) of each row
 			count = 0
@@ -129,3 +129,4 @@ if __name__ == "__main__":
 
 	pyK4A.device_stop_cameras()
 	pyK4A.device_close()
+"""

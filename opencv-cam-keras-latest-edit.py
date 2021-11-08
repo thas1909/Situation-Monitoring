@@ -27,27 +27,26 @@ g = Graph("bolt://neo4j:password@localhost:7687")
 
 # --- pyKinectAzure Imports ---
 import sys
-sys.path.insert(1, 'pykinect/pyKinectAzure/')
-from pykinect.pyKinectAzure import pyKinectAzure, _k4a # to handle depth & color images from this library
+sys.path.insert(1, 'pyKinectAzure/')
+from pyKinectAzure import pyKinectAzure, _k4a # to handle depth & color images from this library
 # Path to the module
 # TODO: Modify with the path containing the k4a.dll from the Azure Kinect SDK
 modulePath = 'C:\\Program Files\\Azure Kinect SDK v1.4.1\\sdk\\windows-desktop\\amd64\\release\\bin\\k4a.dll' 
 # Initialize the library with the path containing the module
-# pyK4A = pyKinectAzure(modulePath)
+pyK4A = pyKinectAzure(modulePath)
 
-# # Open device
-# pyK4A.device_open()
+# Open device
+pyK4A.device_open()
 
-# # Modify camera configuration
-# device_config = pyK4A.config
-# device_config.color_format = _k4a.K4A_IMAGE_FORMAT_COLOR_BGRA32
-# device_config.color_resolution = _k4a.K4A_COLOR_RESOLUTION_720P
-# device_config.depth_mode = _k4a.K4A_DEPTH_MODE_WFOV_2X2BINNED
-# print(device_config)
+# Modify camera configuration
+device_config = pyK4A.config
+device_config.color_format = _k4a.K4A_IMAGE_FORMAT_COLOR_BGRA32
+device_config.color_resolution = _k4a.K4A_COLOR_RESOLUTION_720P
+device_config.depth_mode = _k4a.K4A_DEPTH_MODE_WFOV_2X2BINNED
+print(device_config)
 
-# # Start cameras using modified configuration
-# pyK4A.device_start_cameras(device_config)
-# k = 0
+# Start cameras using modified configuration
+pyK4A.device_start_cameras(device_config)
 
 # --- Tensorflow/Keras Imports ---
 import os
@@ -73,15 +72,17 @@ gpu_num=1
 
 # --- Image Preocessing Library Imports ---
 import cv2
-cap = cv2.VideoCapture(0)
+#cap = cv2.VideoCapture(0)
 from PIL import Image, ImageFont, ImageDraw
 #camera_scale = 1.
 
 # --- Other Imports ---
+import math
 import numpy as np
 import pyautogui # For screeen capture
 import colorsys # For box coloring
 from tabs.risk_data import risk_data 
+from get_object_depth import get_depth_info
 
 # --- Initializing the variables ---
 scale = 1 #To avoid out of frame issues etc. scale goes from 1 to 0.01 (100% to 1%)
@@ -133,7 +134,7 @@ hsv_tuples = [(x / len(class_names), 1., 1.)
             for x in range(len(class_names))]
 colors = list(map(lambda x: colorsys.hsv_to_rgb(*x), hsv_tuples))
 colors = list( map(lambda x: (int(x[0] * 255), int(x[1] * 255), int(x[2] * 255)), colors) 
-             )
+            )
 np.random.seed(10101)  # Fixed seed for consistent colors across runs.
 np.random.shuffle(colors)  # Shuffle colors to decorrelate adjacent classes.
 np.random.seed(None)  # Reset seed to default.
@@ -149,6 +150,9 @@ boxes, scores, classes = yolo_eval( yolo_model.output, anchors,
                                     score_threshold = score, iou_threshold = iou )
 
 sess = K.get_session() # Starting a new keras session...
+key=0
+child_pos=[]
+ppp=1
 
 # .... To be Developed ....
 def get_data_from_neo4j():
@@ -283,7 +287,6 @@ class CvCamera(App):
         
         print(scale) 
 
-
     def on_touch_down(self, touch):
         if touch.is_mouse_scrolling:
             if touch.button == 'scrolldown':
@@ -292,13 +295,19 @@ class CvCamera(App):
                 print('up')
         App.on_touch_down(self,touch)    
 
-    def create_popup(self):
-        global popup_status
-        popup_status=1
-        popup = Popup(title='Warning:  Take Action Immediately ',
-                content=Label(text='[b]Danger Level[\b]:\n  [color=ff3333]Window Is-Above Sofa LEADS-TO Fall[/color] \n Age: Under 3 years \n No. Of. Related Accidents in the past: 100 (Rank:1)'),
-                size_hint=(None, None), size=(400, 400))
-        popup.open()
+    def create_popup(self,obj,dist,risk):
+        # global popup_status
+        # popup_status=1
+        # popup = Popup(title='Warning:  Take Action Immediately ',
+        #         content=Label(text='[b]Danger Level[\b]:\n  [color=ff3333]Window Is-Above Sofa LEADS-TO Fall[/color] \n Age: Under 3 years \n No. Of. Related Accidents in the past: 100 (Rank:1)'),
+        #         size_hint=(None, None), size=(400, 400))
+        # popup.open()
+        global ppp
+        if ppp == 1:
+            run = "python tabs/show_info.py "+obj+" "+risk+" "+"samples/"
+            from subprocess import Popen, PIPE
+            process = Popen(['python', 'tabs/popup.py',obj,dist,risk,run], stdout=PIPE, stderr=PIPE)
+            ppp=2
 
     def createButton(self,x,y,obj,risk):
         # Create info button dynamically
@@ -313,18 +322,18 @@ class CvCamera(App):
         Ry = float(Wh/self.height)
         #print(self.width,self.height,Ww,Wh,Rx,Ry)
         info_buttons = ["i-orange.png","i-yellow.png"]
-        
+        dir="samples/"
         bt = Button(background_normal = 'icons/edit/' + info_buttons[0],
                     size_hint = (0.075,0.1), #0.05,0.075
                     pos = (x*Rx-20, (720 - (y+62))*Ry) # For Kinect : (720 - (y+55))*Ry)  # For Screen-Record: (720 - (y+32))*Ry)
                     )
-        bt.bind(on_press= lambda h:self.show_info(obj,risk))
+        bt.bind(on_press= lambda h:self.show_info(obj,risk,dir))
         self.layout.add_widget(bt)
         
-    def show_info(self,obj,risk):
+    def show_info(self,obj,risk,dir):
         print("Parameter passd to show info function:",obj)
         from subprocess import Popen, PIPE
-        process = Popen(['python', 'tabs/show_info.py',obj,risk], stdout=PIPE, stderr=PIPE)
+        process = Popen(['python', 'tabs/show_info.py',obj,risk,dir], stdout=PIPE, stderr=PIPE)
         
     def show_graph(self):        
         from subprocess import Popen, PIPE
@@ -352,33 +361,45 @@ class CvCamera(App):
 
     def update(self,dt):
         # 基本的にここでOpenCV周りの処理を行なってtextureを更新する
-        global scale
+        global scale,key,child_pos
         global popup_status,main_widget_count
-        #risk_objects=[]
+
         idx=0
-        print("**********************",len(self.layout.children),main_widget_count)
+        #print("**********************",len(self.layout.children),main_widget_count)
         for child in self.layout.children[:-main_widget_count]:
             self.layout.remove_widget(child)                
             #print("child {}: {}".format(idx,child))            
             idx=idx+1
         
         
-        # *********To detect objects via real-time skype or zoom video call **********
+        # --- To detect objects via real-time skype or zoom video call ---
         # im1 = pyautogui.screenshot(region=(0,0, 1920/2, 1080))
         # frame = np.array(im1)
         # frame = cv2.cvtColor(frame,cv2.COLOR_BGR2RGB)
         #print(pyautogui.position())
         
-        #*** Get images/video from kinect DK                
-        ret, frame = cap.read()#ret, frame = self._cap.read()      
-             
-        (H, W) = frame.shape[:2]
+        # --- Get images/video from kinect DK ---   
+        # --- CV2 Method ---
+        # ret, frame = cap.read()#ret, frame = self._cap.read()             
+        # (H, W) = frame.shape[:2]
+        
+        # --- pyKinectAzure Method ---	    
+        # Get capture
+        pyK4A.device_get_capture()
+        # Get the depth image & color image from the capture
+        depth_image_handle = pyK4A.capture_get_depth_image()
+        color_image_handle = pyK4A.capture_get_color_image() 
+        
+        # Read and convert the RGB image data to numpy array & transform the depth image to the color format:
+        frame = pyK4A.image_convert_to_numpy(color_image_handle)[:,:,:3]
+        transformed_depth_image = pyK4A.transform_depth_to_color(depth_image_handle,color_image_handle)
+    
+        H = len(transformed_depth_image) # height
+        W = len(transformed_depth_image[0]) # width
+               
         self.height = H
         self.width = W
-        
-       
-        #Do Zoom In or Zoom Out if required.
-        
+
         #prepare the crop
         centerX,centerY=int(W/2),int(H/2)
     
@@ -430,34 +451,49 @@ class CvCamera(App):
                 out_scores.append(out_scores_x[i])
 
         #print('Found {} boxes for {}'.format(len(out_boxes), 'img'))
-        print("outclasses=",out_classes,type(out_classes),out_boxes,out_scores)
+        #print("outclasses=",out_classes,type(out_classes),out_boxes,out_scores)
         font = ImageFont.truetype(font='font/FiraMono-Medium.otf',
                     size=np.floor(3e-2 * image.size[1] + 0.5).astype('int32'))
         thickness = (image.size[0] + image.size[1]) // 300
         #print("Thickness = ",thickness)
-
+        print(out_classes)
         for i, c in reversed(list(enumerate(out_classes))):
-            # Check for the person outclass=0 points to "Person" in coco-classes.txt
-            child_found = True if "0" in out_classes else False 
-
             predicted_class = class_names[c]
             box = out_boxes[i]
             #score = out_scores[i]
 
-           
+            top, left, bottom, right = box
+            top = max(0, np.floor(top + 0.5).astype('int32'))
+            left = max(0, np.floor(left + 0.5).astype('int32'))
+            bottom = min(image.size[1], np.floor(bottom + 0.5).astype('int32'))
+            right = min(image.size[0], np.floor(right + 0.5).astype('int32'))
+            mid_x = (int)((left+right)/2)
+            mid_y = (int)((top+bottom)/2)
+
+            # Check for the person outclass=0 points to "Person" in coco-classes.txt
+            #child_found = True if 0 in out_classes else False 
+            if predicted_class == "person":
+                key=1
+                child_pos= [mid_x,mid_y]
+                #obj_d = get_depth_info(transformed_depth_image,box)                  
+                print("Child found! and child distance from camera",transformed_depth_image[mid_y,mid_x])
+                     
+                                     
             for k,v in risk_data.items():
                 
                 if predicted_class in k:
+                    distance=100
+                    if key==1:
+                        distance = round(math.sqrt((child_pos[0]-mid_x)**2 + (child_pos[1]-mid_y)**2) * 0.2)
+                        if distance < 50:
+                            print(f'Distance from {predicted_class} is {distance} cms')
+                            self.create_popup(predicted_class, str(distance),v[0])
+                            key=2                        
+
+
                     #risk="Risk: {}".format(v)
                     draw = ImageDraw.Draw(image)
                     #print("Value of V:",v[0],v[1])
-                    top, left, bottom, right = box
-                    top = max(0, np.floor(top + 0.5).astype('int32'))
-                    left = max(0, np.floor(left + 0.5).astype('int32'))
-                    bottom = min(image.size[1], np.floor(bottom + 0.5).astype('int32'))
-                    right = min(image.size[0], np.floor(right + 0.5).astype('int32'))
-                    
-
 
                     #label = "{}: {:.2f}  {}".format(predicted_class,score,risk)
                     #label = '{} {:.2f}'.format(predicted_class, score)
@@ -473,8 +509,7 @@ class CvCamera(App):
                         text_origin = np.array([left, top - 1])
                     
                     # l = 10 # Window size where depth values will be considered
-                    # mid_x = (int)((left+right)/2)
-                    # mid_y = (int)((top+bottom)/2)
+                    
 
                     for i in range(thickness):
                         draw.rectangle(
@@ -517,20 +552,12 @@ class CvCamera(App):
         frame = np.array(image)[:,:,(2,1,0)]
         #cv2.imshow("YOLOv2", np.array(out_img))
 
-        # if "sofa" in risk_objects and popup_status==0:            
-        #     popup_status=1
-        #     from subprocess import Popen, PIPE
-        #     process = Popen(['python', 'popup.py'], stdout=PIPE, stderr=PIPE)
-        #     #self.create_popup()
-
-        ## COMMENT A     
-
         frame = cv2.flip(frame, 0)
         texture1 = Texture.create(size=(frame.shape[1], frame.shape[0]), colorfmt='bgr')
         texture1.blit_buffer(frame.tostring(), colorfmt='bgr', bufferfmt='ubyte')
         self.img1.texture = texture1
 
-if __name__ == '__main__':
+if __name__ == '__main__':    
     CvCamera().run()
 
 

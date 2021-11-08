@@ -11,9 +11,10 @@ from kivy.uix.carousel import Carousel
 from kivy.uix.image import AsyncImage
 
 import sys,os
-directory='samples/'
 obj= sys.argv[1]
 risk= sys.argv[2]
+directory= sys.argv[3] #"samples/"
+
 
 font = "../font/rounded-mgenplus-1cp-medium"
 # kv = Builder.load_string("""
