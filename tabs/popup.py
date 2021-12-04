@@ -1,7 +1,7 @@
 from kivy.config import Config
 # Setting the initial window size of kivy. It can be resizzed during the process too. 
-Config.set('graphics', 'width', '400') 
-Config.set('graphics', 'height', '250')
+Config.set('graphics', 'width', '550') 
+Config.set('graphics', 'height', '300')
 from kivy.core.window import Window
 Window.clearcolor = (1, 1, 1, 1)
 from kivy.app import App
