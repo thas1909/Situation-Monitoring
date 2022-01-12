@@ -26,27 +26,27 @@ from py2neo import Graph,Node,Relationship
 g = Graph("bolt://neo4j:password@localhost:7687")
 
 # --- pyKinectAzure Imports ---
-import sys
-sys.path.insert(1, 'pyKinectAzure/')
-from pyKinectAzure import pyKinectAzure, _k4a # to handle depth & color images from this library
-# Path to the module
-# TODO: Modify with the path containing the k4a.dll from the Azure Kinect SDK
-modulePath = 'C:\\Program Files\\Azure Kinect SDK v1.4.1\\sdk\\windows-desktop\\amd64\\release\\bin\\k4a.dll' 
-# Initialize the library with the path containing the module
-pyK4A = pyKinectAzure(modulePath)
+# import sys
+# sys.path.insert(1, 'pyKinectAzure/')
+# from pyKinectAzure import pyKinectAzure, _k4a # to handle depth & color images from this library
+# # Path to the module
+# # TODO: Modify with the path containing the k4a.dll from the Azure Kinect SDK
+# modulePath = 'C:\\Program Files\\Azure Kinect SDK v1.4.1\\sdk\\windows-desktop\\amd64\\release\\bin\\k4a.dll' 
+# # Initialize the library with the path containing the module
+# pyK4A = pyKinectAzure(modulePath)
 
-# Open device
-pyK4A.device_open()
+# # Open device
+# pyK4A.device_open()
 
-# Modify camera configuration
-device_config = pyK4A.config
-device_config.color_format = _k4a.K4A_IMAGE_FORMAT_COLOR_BGRA32
-device_config.color_resolution = _k4a.K4A_COLOR_RESOLUTION_720P
-device_config.depth_mode = _k4a.K4A_DEPTH_MODE_WFOV_2X2BINNED
-print(device_config)
+# # Modify camera configuration
+# device_config = pyK4A.config
+# device_config.color_format = _k4a.K4A_IMAGE_FORMAT_COLOR_BGRA32
+# device_config.color_resolution = _k4a.K4A_COLOR_RESOLUTION_720P
+# device_config.depth_mode = _k4a.K4A_DEPTH_MODE_WFOV_2X2BINNED
+# print(device_config)
 
-# Start cameras using modified configuration
-pyK4A.device_start_cameras(device_config)
+# # Start cameras using modified configuration
+# pyK4A.device_start_cameras(device_config)
 
 # --- Tensorflow/Keras Imports ---
 import os
@@ -373,9 +373,10 @@ class CvCamera(App):
         
         
         # --- To detect objects via real-time skype or zoom video call ---
-        # im1 = pyautogui.screenshot(region=(0,0, 1920/2, 1080))
-        # frame = np.array(im1)
-        # frame = cv2.cvtColor(frame,cv2.COLOR_BGR2RGB)
+        im1 = pyautogui.screenshot(region=(0,0, 1920/2, 1080))
+        frame = np.array(im1)
+        frame = cv2.cvtColor(frame,cv2.COLOR_BGR2RGB)
+        (H, W) = frame.shape[:2]
         #print(pyautogui.position())
         
         # --- Get images/video from kinect DK ---   
@@ -385,17 +386,17 @@ class CvCamera(App):
         
         # --- pyKinectAzure Method ---	    
         # Get capture
-        pyK4A.device_get_capture()
-        # Get the depth image & color image from the capture
-        depth_image_handle = pyK4A.capture_get_depth_image()
-        color_image_handle = pyK4A.capture_get_color_image() 
+        # pyK4A.device_get_capture()
+        # # Get the depth image & color image from the capture
+        # depth_image_handle = pyK4A.capture_get_depth_image()
+        # color_image_handle = pyK4A.capture_get_color_image() 
         
-        # Read and convert the RGB image data to numpy array & transform the depth image to the color format:
-        frame = pyK4A.image_convert_to_numpy(color_image_handle)[:,:,:3]
-        transformed_depth_image = pyK4A.transform_depth_to_color(depth_image_handle,color_image_handle)
+        # # Read and convert the RGB image data to numpy array & transform the depth image to the color format:
+        # frame = pyK4A.image_convert_to_numpy(color_image_handle)[:,:,:3]
+        # transformed_depth_image = pyK4A.transform_depth_to_color(depth_image_handle,color_image_handle)
     
-        H = len(transformed_depth_image) # height
-        W = len(transformed_depth_image[0]) # width
+        # H = len(transformed_depth_image) # height
+        # W = len(transformed_depth_image[0]) # width
                
         self.height = H
         self.width = W
@@ -469,14 +470,6 @@ class CvCamera(App):
             right = min(image.size[0], np.floor(right + 0.5).astype('int32'))
             mid_x = (int)((left+right)/2)
             mid_y = (int)((top+bottom)/2)
-
-            # Check for the person outclass=0 points to "Person" in coco-classes.txt
-            #child_found = True if 0 in out_classes else False 
-            if predicted_class == "person":
-                key=1
-                child_pos= [mid_x,mid_y]
-                #obj_d = get_depth_info(transformed_depth_image,box)                  
-                print("Child found! and child distance from camera",transformed_depth_image[mid_y,mid_x])
                      
                                      
             for k,v in risk_data.items():
