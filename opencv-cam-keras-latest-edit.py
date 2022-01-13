@@ -23,30 +23,7 @@ from kivy.uix.dropdown import DropDown
 # --- Neo4j Setup ---
 from py2neo import Graph,Node,Relationship
 # Access Graph
-g = Graph("bolt://neo4j:password@localhost:7687")
-
-# --- pyKinectAzure Imports ---
-# import sys
-# sys.path.insert(1, 'pyKinectAzure/')
-# from pyKinectAzure import pyKinectAzure, _k4a # to handle depth & color images from this library
-# # Path to the module
-# # TODO: Modify with the path containing the k4a.dll from the Azure Kinect SDK
-# modulePath = 'C:\\Program Files\\Azure Kinect SDK v1.4.1\\sdk\\windows-desktop\\amd64\\release\\bin\\k4a.dll' 
-# # Initialize the library with the path containing the module
-# pyK4A = pyKinectAzure(modulePath)
-
-# # Open device
-# pyK4A.device_open()
-
-# # Modify camera configuration
-# device_config = pyK4A.config
-# device_config.color_format = _k4a.K4A_IMAGE_FORMAT_COLOR_BGRA32
-# device_config.color_resolution = _k4a.K4A_COLOR_RESOLUTION_720P
-# device_config.depth_mode = _k4a.K4A_DEPTH_MODE_WFOV_2X2BINNED
-# print(device_config)
-
-# # Start cameras using modified configuration
-# pyK4A.device_start_cameras(device_config)
+#g = Graph("bolt://neo4j:password@localhost:7687")
 
 # --- Tensorflow/Keras Imports ---
 import os
@@ -72,9 +49,8 @@ gpu_num=1
 
 # --- Image Preocessing Library Imports ---
 import cv2
-#cap = cv2.VideoCapture(0)
 from PIL import Image, ImageFont, ImageDraw
-#camera_scale = 1.
+
 
 # --- Other Imports ---
 import math
@@ -82,7 +58,7 @@ import numpy as np
 import pyautogui # For screeen capture
 import colorsys # For box coloring
 from tabs.risk_data import risk_data 
-from get_object_depth import get_depth_info
+
 
 # --- Initializing the variables ---
 scale = 1 #To avoid out of frame issues etc. scale goes from 1 to 0.01 (100% to 1%)
@@ -100,7 +76,7 @@ model_image_size = (416, 416) # fixed size or (None, None), hw
 classes_path = os.path.expanduser(classes_path)
 with open(classes_path) as f:
     class_names = f.readlines()
-class_names = [c.strip() for c in class_names]
+class_names = (c.strip() for c in class_names)
 
 # Get Anchors
 anchors_path = os.path.expanduser(anchors_path)
@@ -155,16 +131,17 @@ child_pos=[]
 ppp=1
 
 # .... To be Developed ....
-def get_data_from_neo4j():
-    print("Objects:")
-    dangerousObjects = g.run("""MATCH (n) WHERE EXISTS(n.name) RETURN DISTINCT "node" as entity, n.name AS name LIMIT 25 UNION ALL MATCH ()-[r]-() WHERE EXISTS(r.name) RETURN DISTINCT "relationship" AS entity, r.name AS name""")
-    for record in dangerousObjects:
-        print(record["name"])
 
-    print("\nRisks:")
-    risks = g.run("""MATCH (n) WHERE EXISTS(n.type) RETURN DISTINCT "node" as entity, n.type AS type LIMIT 25 UNION ALL MATCH ()-[r]-() WHERE EXISTS(r.type) RETURN DISTINCT "relationship" AS entity, r.type AS type""")
-    for record in risks:
-        print(record["type"])
+# def get_data_from_neo4j():
+#     print("Objects:")
+#     dangerousObjects = g.run("""MATCH (n) WHERE EXISTS(n.name) RETURN DISTINCT "node" as entity, n.name AS name LIMIT 25 UNION ALL MATCH ()-[r]-() WHERE EXISTS(r.name) RETURN DISTINCT "relationship" AS entity, r.name AS name""")
+#     for record in dangerousObjects:
+#         print(record["name"])
+
+#     print("\nRisks:")
+#     risks = g.run("""MATCH (n) WHERE EXISTS(n.type) RETURN DISTINCT "node" as entity, n.type AS type LIMIT 25 UNION ALL MATCH ()-[r]-() WHERE EXISTS(r.type) RETURN DISTINCT "relationship" AS entity, r.type AS type""")
+#     for record in risks:
+#         print(record["type"])
 
 main_widget_count = 0
 
@@ -381,25 +358,6 @@ class CvCamera(App):
         frame = cv2.cvtColor(frame,cv2.COLOR_BGR2RGB)
         (H, W) = frame.shape[:2]
         #print(pyautogui.position())
-        
-        # --- Get images/video from kinect DK ---   
-        # --- CV2 Method ---
-        # ret, frame = cap.read()#ret, frame = self._cap.read()             
-        # (H, W) = frame.shape[:2]
-        
-        # --- pyKinectAzure Method ---	    
-        # Get capture
-        # pyK4A.device_get_capture()
-        # # Get the depth image & color image from the capture
-        # depth_image_handle = pyK4A.capture_get_depth_image()
-        # color_image_handle = pyK4A.capture_get_color_image() 
-        
-        # # Read and convert the RGB image data to numpy array & transform the depth image to the color format:
-        # frame = pyK4A.image_convert_to_numpy(color_image_handle)[:,:,:3]
-        # transformed_depth_image = pyK4A.transform_depth_to_color(depth_image_handle,color_image_handle)
-    
-        # H = len(transformed_depth_image) # height
-        # W = len(transformed_depth_image[0]) # width
                
         self.height = H
         self.width = W
