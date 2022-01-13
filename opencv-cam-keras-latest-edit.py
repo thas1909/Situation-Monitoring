@@ -373,7 +373,10 @@ class CvCamera(App):
         
         
         # --- To detect objects via real-time skype or zoom video call ---
-        im1 = pyautogui.screenshot(region=(0,0, 1920/2, 1080))
+        # Skype : NO Beta screem (old one) & select "Show Only participants with video screen"
+        im1 = pyautogui.screenshot(region=(0,140, 1920, 830)) #[1920,1080]
+        #Google-Meet
+        ##im1 = pyautogui.screenshot(region=(0,215, 1920, 755))
         frame = np.array(im1)
         frame = cv2.cvtColor(frame,cv2.COLOR_BGR2RGB)
         (H, W) = frame.shape[:2]
