@@ -58,6 +58,7 @@ import numpy as np
 import pyautogui # For screeen capture
 import colorsys # For box coloring
 from tabs.risk_data import risk_data 
+from random import randint
 
 
 # --- Initializing the variables ---
@@ -76,7 +77,7 @@ model_image_size = (416, 416) # fixed size or (None, None), hw
 classes_path = os.path.expanduser(classes_path)
 with open(classes_path) as f:
     class_names = f.readlines()
-class_names = (c.strip() for c in class_names)
+class_names = tuple(c.strip() for c in class_names)
 
 # Get Anchors
 anchors_path = os.path.expanduser(anchors_path)
@@ -126,8 +127,7 @@ boxes, scores, classes = yolo_eval( yolo_model.output, anchors,
                                     score_threshold = score, iou_threshold = iou )
 
 sess = K.get_session() # Starting a new keras session...
-key=0
-child_pos=[]
+
 ppp=1
 
 # .... To be Developed ....
@@ -148,16 +148,17 @@ main_widget_count = 0
 class CvCamera(App):
     
     def build(self): #UIの構築等
-        #self._cap = cv2.VideoCapture(0)   
         global main_widget_count
         # ButtonやSlider等は基本size_hintでサイズ比率を指定(絶対値の時はNoneでsize=)
         # Verticalの中に置くhorizontalなBoxLayout (ここだけ2column)
 
         # For Horizontal Zoom
+        """
         layout2 = BoxLayout(orientation='horizontal', size_hint=(1.0, 0.1))
         self.s1Label = Label(text = 'Zoom', size_hint=(0.3, 1.0), halign='center',color="blue",font_size='30sp',markup=True)
         slider1 = Slider(size_hint=(0.7, 1.0),min=1, max=99,step=1)
         slider1.bind(value=self.slideCallback)
+
         #layout3 = BoxLayout(orientation='vertical', pos_hint={'x':0.8,'y': 0}) #size_hint=(0.1, 1.0)
         
         graph_button = Button(background_normal = 'graph-button.png',
@@ -166,28 +167,30 @@ class CvCamera(App):
                     background_color = (1,1,1,1) )
         graph_button.bind(on_press= lambda h:self.show_graph())        
         """
+        """
         # For Vertical Zoom 
         slider2 = Slider(orientation="vertical",size_hint=(0.7, 1.0),min=1, max=99,step=1) 
         slider2.bind(value=self.slideCallback)
-        self.s2Label = Label(text = 'Slider2', halign='center',color='blue') """
+        self.s2Label = Label(text = 'Slider2', halign='center',color='blue') 
         # # 日本語フォントを使いたいときはfont_nameでフォントへのパス
         #zoomIN = Button(text='Zoom IN', color = "red",pos_hint={'x':.8,'y':.1},size_hint=(0.2, 0.1), font_name='rounded-mgenplus-1cp-medium')
         #zoomOUT = Button(text='Zoom OUT', color = "blue",pos_hint={'x':.8,'y':.2},size_hint=(0.2, 0.1), font_name='rounded-mgenplus-1cp-medium')
 
         #zoomIN.bind(on_release = lambda x:self.buttonCallback(zoomIN.text)) #bindでイベントごとにコールバック指定
         #zoomOUT.bind(on_release = lambda x:self.buttonCallback(zoomOUT.text)) #bindでイベントごとにコールバック指定
-
+        """
         # Imageに後で画像を描く
         self.img1 = Im(allow_stretch = True,keep_ratio = False)
         
         # Layoutを作ってadd_widgetで順次モノを置いていく(並びは置いた順)
         self.layout = FloatLayout()
         self.layout.add_widget(self.img1)
-        # ここだけ2columnでLabelとSliderを並べる
-        self.layout.add_widget(layout2)
-        self.layout.add_widget(graph_button)
-        layout2.add_widget(self.s1Label)
-        layout2.add_widget(slider1)
+       
+        # self.layout.add_widget(layout2)
+        # self.layout.add_widget(graph_button)
+        # layout2.add_widget(self.s1Label)
+        # layout2.add_widget(slider1)
+
         # self.layout.add_widget(layout3)
         # layout3.add_widget(self.s2Label)
         # layout3.add_widget(slider2)
@@ -264,14 +267,6 @@ class CvCamera(App):
         
         print(scale) 
 
-    def on_touch_down(self, touch):
-        if touch.is_mouse_scrolling:
-            if touch.button == 'scrolldown':
-                print('down')
-            elif touch.button == 'scrollup':
-                print('up')
-        App.on_touch_down(self,touch)    
-
     def create_popup(self,obj,dist,risk):
         # global popup_status
         # popup_status=1
@@ -287,23 +282,29 @@ class CvCamera(App):
             ppp=2
 
     def createButton(self,x,y,obj,risk):
-        # Create info button dynamically
-        # if h<100 or w<100:
-        #     print("h={},w={}".format(h,w))
-        #     val= (0.2*h,0.3*w)
-        # else:
-        #     val = (20,35)
+        
         # Get the current kivy window height & width 
         (Ww,Wh)=Window.size
         Rx = float(Ww/self.width)
         Ry = float(Wh/self.height)
-        #print(self.width,self.height,Ww,Wh,Rx,Ry)
-        info_buttons = ["i-orange.png","i-yellow.png"]
         dir="samples/"
-        bt = Button(background_normal = 'icons/edit/' + info_buttons[0],
-                    size_hint = (0.075,0.1), #0.05,0.075
-                    pos = (x*Rx-20, (720 - (y+62))*Ry) # For Kinect : (720 - (y+55))*Ry)  # For Screen-Record: (720 - (y+32))*Ry)
+       
+        # Info-buttons with bounding box version 
+        info_buttons = ["i-orange.png","i-yellow.png"]
+        but_path = 'icons/edit/' + info_buttons[0]
+        bt = Button(background_normal = but_path,
+                    size_hint = (0.05,0.075), #0.05,0.075
+                    pos = (x*Rx-20, (720 - (y+32))*Ry) # For Kinect : (720 - (y+55))*Ry)  # For Screen-Record: (720 - (y+32))*Ry)
                     )
+        # Only Rabbit version
+        #rabbit_buttons = ("up","down","left","right")
+        #but_path = 'icons/rabbit/' + rabbit_buttons[randint(0,len(rabbit_buttons)-1)] + '.png'
+        #but_path = 'icons/rabbit/down.png'
+
+        # bt = Button(background_normal = but_path,
+        #             size_hint = (0.08,0.13), #0.05,0.075
+        #             pos = (x*Rx-20, (720 - (y))*Ry) # For Kinect : (720 - (y+55))*Ry)  # For Screen-Record: (720 - (y+32))*Ry)
+        #             )
         bt.bind(on_press= lambda h:self.show_info(obj,risk,dir))
         self.layout.add_widget(bt)
         
@@ -338,8 +339,7 @@ class CvCamera(App):
 
     def update(self,dt):
         # 基本的にここでOpenCV周りの処理を行なってtextureを更新する
-        global scale,key,child_pos
-        global popup_status,main_widget_count
+        global scale,popup_status,main_widget_count
 
         idx=0
         #print("**********************",len(self.layout.children),main_widget_count)
@@ -405,46 +405,40 @@ class CvCamera(App):
         # Extract only unique labels 
         out_boxes =[]
         out_classes=[]
-        out_scores=[]
+        #out_scores=[]
         for i,c in enumerate(out_classes_x):
             if c not in out_classes:
                 out_classes.append(c)
                 out_boxes.append(out_boxes_x[i])
-                out_scores.append(out_scores_x[i])
+                #out_scores.append(out_scores_x[i])
 
         #print('Found {} boxes for {}'.format(len(out_boxes), 'img'))
         #print("outclasses=",out_classes,type(out_classes),out_boxes,out_scores)
+
         font = ImageFont.truetype(font='font/FiraMono-Medium.otf',
                     size=np.floor(3e-2 * image.size[1] + 0.5).astype('int32'))
+                    
         thickness = (image.size[0] + image.size[1]) // 300
-        #print("Thickness = ",thickness)
+
         print(out_classes)
+
         for i, c in reversed(list(enumerate(out_classes))):
             predicted_class = class_names[c]
             box = out_boxes[i]
-            #score = out_scores[i]
+            
 
             top, left, bottom, right = box
             top = max(0, np.floor(top + 0.5).astype('int32'))
             left = max(0, np.floor(left + 0.5).astype('int32'))
             bottom = min(image.size[1], np.floor(bottom + 0.5).astype('int32'))
             right = min(image.size[0], np.floor(right + 0.5).astype('int32'))
-            mid_x = (int)((left+right)/2)
-            mid_y = (int)((top+bottom)/2)
+            
                      
                                      
             for k,v in risk_data.items():
                 
                 if predicted_class in k:
-                    distance=100
-                    if key==1:
-                        distance = round(math.sqrt((child_pos[0]-mid_x)**2 + (child_pos[1]-mid_y)**2) * 0.2)
-                        if distance < 50:
-                            print(f'Distance from {predicted_class} is {distance} cms')
-                            self.create_popup(predicted_class, str(distance),v[0])
-                            key=2                        
-
-
+                    
                     #risk="Risk: {}".format(v)
                     draw = ImageDraw.Draw(image)
                     #print("Value of V:",v[0],v[1])
@@ -452,24 +446,24 @@ class CvCamera(App):
                     #label = "{}: {:.2f}  {}".format(predicted_class,score,risk)
                     #label = '{} {:.2f}'.format(predicted_class, score)
                     #cv2.putText(frame, text, (left, top - 5),cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
-                    label = predicted_class
+                    
                 
-                    label_size = draw.textsize(label, font)
-                    print(label, (left, top), (right, bottom))
+                    #label_size = draw.textsize(predicted_class, font)
+                    print(predicted_class, (left, top), (right, bottom))
 
-                    if top - label_size[1] >= 0:
-                        text_origin = np.array([left, top - label_size[1]])
-                    else:
-                        text_origin = np.array([left, top - 1])
+                    # if top - label_size[1] >= 0:
+                    #     text_origin = np.array([left, top - label_size[1]])
+                    # else:
+                    #     text_origin = np.array([left, top - 1])
                     
                     # l = 10 # Window size where depth values will be considered
                     
-
                     for i in range(thickness):
                         draw.rectangle(
                             [left + i, top + i, right - i, bottom - i],
                             outline=colors[c]
                         )
+
                         # # box showing the region where depth values will be considered
                         # draw.rectangle(
                         #     [mid_x-l + i, mid_y-l + i, mid_x+l - i, mid_y+l - i],
@@ -499,9 +493,8 @@ class CvCamera(App):
                     # To send the objects detected to show it the drop-down list in Graph
                     if predicted_class not in risk_objects:
                         risk_objects.append(predicted_class) 
-                    #....print("HERE:",k)
-                #else:
-                    #risk=""
+                    
+
         print("*******")            
         frame = np.array(image)[:,:,(2,1,0)]
         #cv2.imshow("YOLOv2", np.array(out_img))
