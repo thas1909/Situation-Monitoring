@@ -2,19 +2,20 @@ from kivy.core.window import Window
 Window.clearcolor = (1, 1, 1, 1)
 from kivy.app import App
 from kivy.lang import Builder
+
 from kivy.uix.boxlayout import BoxLayout
-from kivy.uix.gridlayout import GridLayout
+#from kivy.uix.gridlayout import GridLayout
 from kivy.uix.button import Button
 from kivy.uix.label import Label
-from kivy.uix.image import Image
+#from kivy.uix.image import Image
 from kivy.uix.carousel import Carousel
 from kivy.uix.image import AsyncImage
 
 import sys,os
+
 obj= sys.argv[1]
 risk= sys.argv[2]
 directory= sys.argv[3] #"samples/"
-
 
 font = "../font/rounded-mgenplus-1cp-medium"
 # kv = Builder.load_string("""
@@ -31,15 +32,17 @@ class show_info(App):
 
     def build(self):
         main_layout = BoxLayout(orientation='vertical')
-        
+
         warn = Label(   text="[b]注意[/b]：「"+"[color=ff3333]"+obj.upper()+"[/color]"+"」に関して、以下に示すような危険性が予測されます！! ",
                         font_name=font,
                         color="black",
                         font_size='20sp',
                         size_hint=(1.0,0.1),
+                        pos_hint={'x':0, 'y':0},
                         markup = True,
                         )
-        main_layout.add_widget(warn)
+        main_layout.add_widget(warn)        
+
         details = Label(text="[b]RISK[/b]: "+risk,                        
                         font_name=font,
                         color="red",
@@ -49,11 +52,9 @@ class show_info(App):
                         )
         main_layout.add_widget(details)
 
-        #layout = BoxLayout(orientation='horizontal',spacing=10)
+
+        # layout = BoxLayout(orientation='horizontal',spacing=10)
         # layout = GridLayout(cols=2,spacing=10)      
-
-        
-
         # for filename in os.listdir(directory):
         #     if obj in filename: 
         #             fil = os.path.join(directory, filename)
@@ -80,7 +81,8 @@ class show_info(App):
                     carousel.add_widget(image)
                     print(carousel.index)
         main_layout.add_widget(carousel)
-        return main_layout
+        return main_layout  
+
 
 
 if __name__ == "__main__":

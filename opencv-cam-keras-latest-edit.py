@@ -81,6 +81,8 @@ import math
 import numpy as np
 import pyautogui # For screeen capture
 import colorsys # For box coloring
+import pandas as pd
+from googletrans import Translator #googleのAPI
 from tabs.risk_data import risk_data 
 from get_object_depth import get_depth_info
 
@@ -167,6 +169,11 @@ def get_data_from_neo4j():
         print(record["type"])
 
 main_widget_count = 0
+
+print("..................................................\nReading Excel Data ... ")
+#実際のアプリを動かす作業
+database1 = pd.read_excel("D:\\402_demo\\2018_全国_保育所の事故.xlsx")
+print("Pandas Data Ready!!!\n..................................................")
 
 class CvCamera(App):
     
@@ -306,7 +313,7 @@ class CvCamera(App):
         if ppp == 1:
             run = "python tabs/show_info.py "+obj+" "+risk+" "+"samples/"
             from subprocess import Popen, PIPE
-            process = Popen(['python', 'tabs/popup.py',obj,dist,risk,run], stdout=PIPE, stderr=PIPE)
+            popup_process = Popen(['python', 'tabs/popup.py',obj,dist,risk,run], stdout=PIPE, stderr=PIPE)
             ppp=2
 
     def createButton(self,x,y,obj,risk):
@@ -333,13 +340,49 @@ class CvCamera(App):
     def show_info(self,obj,risk,dir):
         print("Parameter passd to show info function:",obj)
         from subprocess import Popen, PIPE
-        process = Popen(['python', 'tabs/show_info.py',obj,risk,dir], stdout=PIPE, stderr=PIPE)
+        show_info_process = Popen(['python', 'tabs/show_info.py',obj,risk,dir], stdout=PIPE, stderr=PIPE)
+
+        input_age = 2
+        input_word_en = obj 
+
+        #日本語に変更（GoogleのAPIを使う）
+        translator = Translator()
+        input_word_ja = translator.translate(input_word_en,src="en", dest="ja").text
+        print(input_word_ja)
+
+        #年齢で抽出
+        database2 = database1[database1["被災年齢"] == input_age]
+
+        #分かち書きしたリストを作成
+        wakati_list = [0]*len(database2)
+        for i in range(len(database2)):
+            wakati_list[i] = database2.iat[i,42].split(" ")#単語をリストに格納
+
+        #単語で抽出
+        database3 = database2.copy()#copy()で値渡し（元の値を変更しなくなる）
+        database3["単語の有無"] = 0#単語の有無の行
+        for i in range(len(database2)):  #リスト内の単語が文章にあったら1を追加
+            for j in range(len(wakati_list[i])):
+                if wakati_list[i][j] == input_word_ja:
+                    database3["単語の有無"].iat[i] = 1#"1"から1に変更
+                    break
+
+        database4 = database3[database3["単語の有無"] == 1]#1を抽出
+        database4.drop("単語の有無",axis=1,inplace=True)#単語の有無行のドロップ
+        data = database4["災害発生時の状況"].values[:5]
+        #print(data)
+        pass_data = ""
+        for i in data:
+            pass_data += i + ","
+        print(pass_data)
+        print(pass_data.split(","))
+        show_ozaki_data_process = Popen(['python', 'tabs/show_ozaki_data.py',pass_data], stdout=PIPE, stderr=PIPE)
         
     def show_graph(self):        
         from subprocess import Popen, PIPE
         values = ','.join(risk_objects)
         print("Risk objects",values)
-        process = Popen(['python', 'tabs/graph.py',values], stdout=PIPE, stderr=PIPE)
+        show_graph_process = Popen(['python', 'tabs/graph.py',values], stdout=PIPE, stderr=PIPE)
 
     def show_logo(self,x,y):
         (Ww,Wh)=Window.size
