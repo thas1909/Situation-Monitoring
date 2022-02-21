@@ -293,8 +293,8 @@ class CvCamera(App):
         info_buttons = ["i-orange.png","i-yellow.png"]
         but_path = 'icons/edit/' + info_buttons[0]
         bt = Button(background_normal = but_path,
-                    size_hint = (0.05,0.075), #0.05,0.075
-                    pos = (x*Rx-20, (720 - (y+32))*Ry) # For Kinect : (720 - (y+55))*Ry)  # For Screen-Record: (720 - (y+32))*Ry)
+                    size_hint = (0.075,0.1), #0.05,0.075
+                    pos = (x*Rx-20, (720 - (y-32))*Ry) # For Kinect : (720 - (y+55))*Ry)  # For Screen-Record: (720 - (y+32))*Ry)
                     )
         # Only Rabbit version
         #rabbit_buttons = ("up","down","left","right")
