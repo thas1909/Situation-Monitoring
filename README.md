@@ -20,4 +20,3 @@ Download `yolov3.h5` pretrained model and place it in the `model_data` directory
 `Ozaki-module`
 - googletrans==4.0.0-rc1
 - pandas
-- tkinter
