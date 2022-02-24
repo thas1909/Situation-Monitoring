@@ -23,7 +23,7 @@ from kivy.uix.dropdown import DropDown
 # --- Neo4j Setup ---
 from py2neo import Graph,Node,Relationship
 # Access Graph
-g = Graph("bolt://neo4j:password@localhost:7687")
+#g = Graph("bolt://neo4j:password@localhost:7687")
 
 # --- pyKinectAzure Imports ---
 import sys
@@ -57,18 +57,30 @@ from timeit import default_timer as timer
 from tensorflow.compat.v1 import ConfigProto
 from tensorflow.compat.v1 import InteractiveSession
 
-config = ConfigProto()
-config.gpu_options.allow_growth = True
-session = InteractiveSession(config=config)
+# config = ConfigProto()
+# config.gpu_options.allow_growth = True
+# session = InteractiveSession(config=config)
 
-from keras import backend as K
+#from keras import backend as K
+import tensorflow.python.keras.backend as K
+import tensorflow as tf
+tf.compat.v1.disable_eager_execution()
+
 from keras.models import load_model
 from keras.layers import Input
-from keras.utils import multi_gpu_model
+#from keras.utils import multi_gpu_model
+from tensorflow.python.keras.utils.multi_gpu_utils import multi_gpu_model
+
+
+cpu_num= len(tf.config.list_physical_devices('CPU'))
+print("Num CPUs Available: ", cpu_num)
+
+gpu_num= len(tf.config.list_physical_devices('GPU'))
+print("Num GPUs Available: ", gpu_num)
+
 
 from yolo3.model import yolo_eval, yolo_body, tiny_yolo_body
 from yolo3.utils import letterbox_image
-gpu_num=1
 
 # --- Image Preocessing Library Imports ---
 import cv2
@@ -79,7 +91,6 @@ from PIL import Image, ImageFont, ImageDraw
 # --- Other Imports ---
 import math
 import numpy as np
-import pyautogui # For screeen capture
 import colorsys # For box coloring
 import pandas as pd
 from googletrans import Translator #googleのAPI
@@ -144,8 +155,8 @@ np.random.seed(None)  # Reset seed to default.
 # Generate output tensor targets for filtered bounding boxes.
 input_image_shape = K.placeholder(shape=(2, ))
 
-# if gpu_num>=2:
-#     yolo_model = multi_gpu_model(yolo_model, gpus=gpu_num)
+if gpu_num>=2:
+    yolo_model = multi_gpu_model(yolo_model, gpus=gpu_num)
 
 boxes, scores, classes = yolo_eval( yolo_model.output, anchors,
                                     len(class_names), input_image_shape,
@@ -172,7 +183,7 @@ main_widget_count = 0
 
 print("..................................................\nReading Excel Data ... ")
 #実際のアプリを動かす作業
-database1 = pd.read_excel("D:\\402_demo\\2018_全国_保育所の事故.xlsx")
+database1 = pd.read_excel("F:\\402_demo\\2018_全国_保育所の事故.xlsx")
 print("Pandas Data Ready!!!\n..................................................")
 
 class CvCamera(App):
@@ -246,7 +257,7 @@ class CvCamera(App):
         print("////////////////// Len of widget:",main_widget_count)
 
         # 更新スケジュールとコールバックの指定
-        Clock.schedule_interval(self.update, 1.0/30.0)
+        Clock.schedule_interval(self.update, 1.0/10.0)
         return self.layout
 
     def get_drop_down(self,objects):
