@@ -50,8 +50,6 @@ pyK4A.device_start_cameras(device_config)
 
 # --- Tensorflow/Keras Imports ---
 import os
-os.environ['CUDA_VISIBLE_DEVICES'] = '0'
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 from timeit import default_timer as timer
 
 from tensorflow.compat.v1 import ConfigProto
@@ -257,7 +255,7 @@ class CvCamera(App):
         print("////////////////// Len of widget:",main_widget_count)
 
         # 更新スケジュールとコールバックの指定
-        Clock.schedule_interval(self.update, 1.0/10.0)
+        Clock.schedule_interval(self.update, 1.0/30.0)
         return self.layout
 
     def get_drop_down(self,objects):
@@ -448,39 +446,39 @@ class CvCamera(App):
         frame = pyK4A.image_convert_to_numpy(color_image_handle)[:,:,:3]
         transformed_depth_image = pyK4A.transform_depth_to_color(depth_image_handle,color_image_handle)
     
-        H = len(transformed_depth_image) # height
-        W = len(transformed_depth_image[0]) # width
-               
-        self.height = H
-        self.width = W
+        self.height = len(transformed_depth_image) # height
+        self.width = len(transformed_depth_image[0]) # width
 
-        #prepare the crop
-        centerX,centerY=int(W/2),int(H/2)
-    
-        radiusX,radiusY= int(scale*centerX),int(scale*centerY)
-
-        minX,maxX=centerX-radiusX,centerX+radiusX
-        minY,maxY=centerY-radiusY,centerY+radiusY
+        if scale<1:
+            #prepare the crop
+            centerX,centerY=int(self.width/2),int(self.height/2)
         
-        #cv2.imshow("original",frame)
-        cropped = frame[minY:maxY , minX:maxX]
-        #cv2.imshow("cropped",cropped)
-        # The modified frame
-        frame = cv2.resize(cropped, (W,H),interpolation = cv2.INTER_AREA)
+            radiusX,radiusY= int(scale*centerX),int(scale*centerY)
+
+            minX,maxX=centerX-radiusX,centerX+radiusX
+            minY,maxY=centerY-radiusY,centerY+radiusY
+            
+            #cv2.imshow("original",frame)
+            cropped = frame[minY:maxY , minX:maxX]
+            #cv2.imshow("cropped",cropped)
+            # The modified frame
+            frame = cv2.resize(cropped, (self.width,self.height),interpolation = cv2.INTER_AREA)
                    
         frame = frame[:,:,(2,1,0)]
         image = Image.fromarray(frame)
 
-        # if self.model_image_size != (None, None):
-        #     assert self.model_image_size[0]%32 == 0, 'Multiples of 32 required'
-        #     assert self.model_image_size[1]%32 == 0, 'Multiples of 32 required'
-        #     boxed_image = letterbox_image(image, tuple(reversed(self.model_image_size)))
+        boxed_image = letterbox_image(image, tuple(reversed(model_image_size))) #'Multiples of 32 required'
+
+        # if model_image_size != (None, None):
+        #     assert model_image_size[0]%32 == 0, 'Multiples of 32 required'
+        #     assert model_image_size[1]%32 == 0, 'Multiples of 32 required'
+        #     boxed_image = letterbox_image(image, tuple(reversed(model_image_size)))
         # else:
-        new_image_size = (image.width - (image.width % 32),
-                            image.height - (image.height % 32))
-        
-        boxed_image = letterbox_image(image, new_image_size)
-        
+        #     new_image_size = (image.width - (image.width % 32),
+        #                         image.height - (image.height % 32))
+            
+        #     boxed_image = letterbox_image(image, new_image_size)
+            
         image_data = np.array(boxed_image, dtype='float32')
 
         #print(image_data.shape)
