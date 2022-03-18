@@ -181,7 +181,7 @@ main_widget_count = 0
 
 print("..................................................\nReading Excel Data ... ")
 #実際のアプリを動かす作業
-database1 = pd.read_excel("F:\\402_demo\\2018_全国_保育所の事故.xlsx")
+#database1 = pd.read_excel("F:\\402_demo\\2018_全国_保育所の事故.xlsx")
 print("Pandas Data Ready!!!\n..................................................")
 
 class CvCamera(App):
@@ -526,6 +526,30 @@ class CvCamera(App):
             #child_found = True if 0 in out_classes else False 
             if predicted_class == "person":
                 key=1
+                child_2d_height = bottom-top
+                child_distance = transformed_depth_image[mid_y,mid_x]
+                """
+                A sample conversioon rate taken from a child of acually 950mm
+                measured 2d height = 212 px
+                measured child distance = 2988 mm
+                Real child height = 920 mm 
+                """
+                transformed_child_height =(int) (child_2d_height * child_distance * 920 / (212 * 2988))
+                print("Child_2d_height",child_2d_height)
+                print("Child's transformed height:",transformed_child_height,"mm")
+                # child height-to-year transformation equation
+                child_year = 0.013 * transformed_child_height - 8.6
+                child_year = 1 if child_year<0 else round(child_year,2)
+                print("Estimated Child's year:",child_year,"yrs")
+
+                draw = ImageDraw.Draw(image)
+                for i in range(thickness):
+                    draw.rectangle(
+                        [left + i, top + i, right - i, bottom - i],
+                        outline=colors[c]
+                    )
+                del draw
+                
                 child_pos= [mid_x,mid_y]
                 #obj_d = get_depth_info(transformed_depth_image,box)                  
                 print("Child found! and child distance from camera",transformed_depth_image[mid_y,mid_x])
@@ -542,12 +566,9 @@ class CvCamera(App):
                             self.create_popup(predicted_class, str(distance),v[0])
                             key=2                        
 
-
-                    #risk="Risk: {}".format(v)
                     draw = ImageDraw.Draw(image)
                     #print("Value of V:",v[0],v[1])
 
-                    #label = "{}: {:.2f}  {}".format(predicted_class,score,risk)
                     #label = '{} {:.2f}'.format(predicted_class, score)
                     #cv2.putText(frame, text, (left, top - 5),cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
                     label = predicted_class
