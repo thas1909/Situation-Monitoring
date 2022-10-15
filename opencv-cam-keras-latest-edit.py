@@ -27,26 +27,24 @@ from py2neo import Graph,Node,Relationship
 
 # --- pyKinectAzure Imports ---
 import sys
-sys.path.insert(1, 'pyKinectAzure/')
-from pyKinectAzure import pyKinectAzure, _k4a # to handle depth & color images from this library
-# Path to the module
-# TODO: Modify with the path containing the k4a.dll from the Azure Kinect SDK
-modulePath = 'C:\\Program Files\\Azure Kinect SDK v1.4.1\\sdk\\windows-desktop\\amd64\\release\\bin\\k4a.dll' 
-# Initialize the library with the path containing the module
-pyK4A = pyKinectAzure(modulePath)
+sys.path.insert(1, './')
+import pykinect_azure as pykinect
 
-# Open device
-pyK4A.device_open()
+# Initialize the library, if the library is not found, add the library path as argument
+pykinect.initialize_libraries(track_body=True)
 
 # Modify camera configuration
-device_config = pyK4A.config
-device_config.color_format = _k4a.K4A_IMAGE_FORMAT_COLOR_BGRA32
-device_config.color_resolution = _k4a.K4A_COLOR_RESOLUTION_720P
-device_config.depth_mode = _k4a.K4A_DEPTH_MODE_WFOV_2X2BINNED
-print(device_config)
+device_config = pykinect.default_configuration
+device_config.color_format = pykinect.K4A_IMAGE_FORMAT_COLOR_BGRA32
+device_config.color_resolution = pykinect.K4A_COLOR_RESOLUTION_720P
+device_config.depth_mode = pykinect.K4A_DEPTH_MODE_WFOV_2X2BINNED
+#print(device_config)
 
-# Start cameras using modified configuration
-pyK4A.device_start_cameras(device_config)
+# Start device
+device = pykinect.start_device(config=device_config)
+
+# Start body tracker
+bodyTracker = pykinect.start_body_tracker()
 
 # --- Tensorflow/Keras Imports ---
 import os
@@ -422,26 +420,31 @@ class CvCamera(App):
             self.layout.remove_widget(child)                
             #print("child {}: {}".format(idx,child))            
             idx=idx+1
-        
-        
-        # --- To detect objects via real-time skype or zoom video call ---
-        # im1 = pyautogui.screenshot(region=(0,0, 1920/2, 1080))
-        # frame = np.array(im1)
-        # frame = cv2.cvtColor(frame,cv2.COLOR_BGR2RGB)
-        #print(pyautogui.position())
-        
+             
         # --- Get images/video from kinect DK ---   
         # --- CV2 Method ---
         # ret, frame = cap.read()#ret, frame = self._cap.read()             
         # (H, W) = frame.shape[:2]
         
-        # --- pyKinectAzure Method ---	    
+        # --- pyKinectAzure Method ---
+    	    
         # Get capture
         pyK4A.device_get_capture()
         # Get the depth image & color image from the capture
         depth_image_handle = pyK4A.capture_get_depth_image()
         color_image_handle = pyK4A.capture_get_color_image() 
         
+        capture = device.update()
+
+        # Get body tracker frame
+        body_frame = bodyTracker.update()
+        
+        # Get the color image
+        ret, color_image = capture.get_color_image()
+        ret, depth_image = capture.get_depth_image()
+        ret, transformed_colored_depth_image = capture.get_transformed_colored_depth_image()
+        ret, transformed_depth_image = capture.get_transformed_depth_image()
+
         # Read and convert the RGB image data to numpy array & transform the depth image to the color format:
         frame = pyK4A.image_convert_to_numpy(color_image_handle)[:,:,:3]
         transformed_depth_image = pyK4A.transform_depth_to_color(depth_image_handle,color_image_handle)
