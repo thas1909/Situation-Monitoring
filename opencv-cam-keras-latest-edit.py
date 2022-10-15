@@ -181,7 +181,7 @@ main_widget_count = 0
 
 print("..................................................\nReading Excel Data ... ")
 #実際のアプリを動かす作業
-#database1 = pd.read_excel("F:\\402_demo\\2018_全国_保育所の事故.xlsx")
+database1 = pd.read_excel("F:\\402_demo\\2018_全国_保育所の事故.xlsx")
 print("Pandas Data Ready!!!\n..................................................")
 
 class CvCamera(App):
@@ -548,6 +548,14 @@ class CvCamera(App):
                         [left + i, top + i, right - i, bottom - i],
                         outline=colors[c]
                     )
+                
+                label = 'Child Year {:.2f}'.format(child_year)
+                label_size = draw.textsize(label, font)
+                if top - label_size[1] >= 0:
+                    text_origin = np.array([left, top - label_size[1]])
+                else:
+                    text_origin = np.array([left, top - 1])
+                draw.text(text_origin, label, fill=colors[c], font=font)
                 del draw
                 
                 child_pos= [mid_x,mid_y]
